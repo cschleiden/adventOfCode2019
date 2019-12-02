@@ -12,8 +12,6 @@ func calculateFuel(input int) int {
 }
 
 func main() {
-	fmt.Println("Hello World")
-
 	file, err := os.Open("./input1.txt")
 	if err != nil {
 		os.Exit(1)
@@ -30,7 +28,18 @@ func main() {
 		if err != nil {
 			os.Exit(2)
 		}
-		result += calculateFuel(input)
+
+		fuel := calculateFuel(input)
+
+		// Calculate fuel for fuel
+		remaining := calculateFuel(fuel)
+		for remaining > 0 {
+			fuel += remaining
+
+			remaining = calculateFuel(remaining)
+		}
+
+		result += fuel
 	}
 
 	fmt.Println(result)
