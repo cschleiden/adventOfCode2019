@@ -54,12 +54,23 @@ func main() {
 		}
 	}
 
-	// Modify
-	inputs[1] = 12
-	inputs[2] = 2
+	for i := 0; i < 99; i++ {
+		for j := 0; j < 99; j++ {
+			fmt.Println("Trying", i, j)
 
-	ExecuteProgram(inputs)
+			// Duplicate program to reset inputs
+			p := make([]int, len(inputs))
+			copy(p, inputs)
 
-	// Output
-	fmt.Println(inputs[0])
+			p[1] = i
+			p[2] = j
+
+			ExecuteProgram(p)
+
+			if p[0] == 19690720 {
+				fmt.Println(i, j, 100*i+j)
+				return
+			}
+		}
+	}
 }
