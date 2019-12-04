@@ -7,6 +7,6 @@ type Point struct {
 	y int64
 }
 
-func (p *Point) DistanceFromOrigin() int {
-	return int(math.Abs(float64(p.x)) + math.Abs(float64(p.y)))
+func (p *Point) DistanceFromOrigin() int64 {
+	return int64(math.Abs(float64(p.x)) + math.Abs(float64(p.y)))
 }
