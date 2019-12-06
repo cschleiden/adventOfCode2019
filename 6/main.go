@@ -3,15 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 )
 
 func main() {
 	//
-	// orbiting := make(map[string][]string)
-	orbits := make(map[string]string)
-	objects := make([]string, 0)
+	orbits := make(map[string][]string)
 
 	// Parse
 	file, err := os.Open("./input6.txt")
@@ -25,20 +24,34 @@ func main() {
 		line := scanner.Text()
 
 		input := strings.Split(line, ")")
-		// orbiting[input[0]] = append(orbiting[input[0]], input[1])
-		orbits[input[1]] = input[0]
-		objects = append(objects, input[1])
+		// can move in both directions
+		orbits[input[1]] = append(orbits[input[1]], input[0])
+		orbits[input[0]] = append(orbits[input[0]], input[1])
 	}
 
-	total := 0
+	min := math.MaxInt32
+	var candidates stack
+	for _, o := range orbits["YOU"] {
+		candidates = candidates.Push(e{o, 0})
+	}
+	visited := make(map[string]bool)
+	for len(candidates) > 0 {
+		var x e
+		candidates, x = candidates.Pop()
+		visited[x.object] = true
 
-	for _, object := range objects {
-		o := orbits[object]
-		for o != "" {
-			total++
-			o = orbits[o]
+		if x.object == "SAN" {
+			min = int(math.Min(float64(min), float64(x.path)))
+		} else {
+			// Enqueue children
+			for _, next := range orbits[x.object] {
+				if !visited[next] {
+					candidates = candidates.Push(e{next, x.path + 1})
+				}
+			}
 		}
 	}
 
-	fmt.Println(total)
+	// We don't have to reach SAN, just get into the same orbit
+	fmt.Println(min - 1)
 }
