@@ -6,16 +6,14 @@ import (
 )
 
 func isValid(input int) bool {
-	adjacent := false
 	previousDigit := -1
+	digitCount := make(map[int]int)
 
 	s := strconv.Itoa(input)
 	for _, x := range s {
 		digit, _ := strconv.Atoi(string(x))
 
-		if previousDigit == digit && !adjacent {
-			adjacent = true
-		}
+		digitCount[digit] = digitCount[digit] + 1
 
 		if previousDigit > digit {
 			return false
@@ -24,14 +22,18 @@ func isValid(input int) bool {
 		previousDigit = digit
 	}
 
-	return adjacent
+	for _, v := range digitCount {
+		if v == 2 {
+			return true
+		}
+	}
+
+	return false
 }
 
 func main() {
 	rangeStart := 147981
 	rangeEnd := 691423
-
-	isValid(1223)
 
 	valid := 0
 	for i := rangeStart; i <= rangeEnd; i++ {
