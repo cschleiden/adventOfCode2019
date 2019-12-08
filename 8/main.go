@@ -2,9 +2,29 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"strconv"
+
+	colorfmt "github.com/fatih/color"
 )
+
+type color int
+
+const (
+	black       color = 0
+	white             = 1
+	transparent       = 2
+)
+
+func (c *color) print() {
+	switch *c {
+	case black:
+		colorfmt.New(colorfmt.BgBlack, colorfmt.FgBlack).Print("░")
+	case white:
+		colorfmt.New(colorfmt.BgWhite, colorfmt.FgWhite).Print("█")
+	case transparent:
+		fmt.Print(" ")
+	}
+}
 
 type layer struct {
 	pixels [][]int
@@ -24,11 +44,11 @@ func parseImage(w, h int, data string) *image {
 	for i := 0; i < len(data); {
 		l := &layer{}
 
-		for x := 0; x < w; x++ {
+		for y := 0; y < h; y++ {
 			l.pixels = append(l.pixels, make([]int, w))
 
-			for y := 0; y < h; y++ {
-				l.pixels[x][y], _ = strconv.Atoi(string(data[i]))
+			for x := 0; x < w; x++ {
+				l.pixels[y][x], _ = strconv.Atoi(string(data[i]))
 
 				i++
 			}
@@ -40,35 +60,30 @@ func parseImage(w, h int, data string) *image {
 	return img
 }
 
-func main() {
-	image := parseImage(25, 6, input1)
+func (i *image) print() {
+	for y := 0; y < i.h; y++ {
+		for x := 0; x < i.w; x++ {
+			var pixel color
 
-	// Find layers
-	var result int
-	minZeroes := math.MaxInt32
-	for _, layer := range image.layers {
-		zeroes := 0
-		ones := 0
-		twos := 0
-		for x := 0; x < image.w; x++ {
-			for y := 0; y < image.w; y++ {
-				d := layer.pixels[x][y]
-
-				if d == 0 {
-					zeroes++
-				} else if d == 1 {
-					ones++
-				} else if d == 2 {
-					twos++
+			for _, layer := range i.layers {
+				p := layer.pixels[y][x]
+				if p != transparent {
+					pixel = color(p)
+					break
 				}
 			}
+
+			pixel.print()
 		}
 
-		if zeroes < minZeroes {
-			minZeroes = zeroes
-			result = ones * twos
-		}
+		fmt.Println()
 	}
+}
 
-	fmt.Println(result)
+func main() {
+	image := parseImage(25, 6, input1)
+	image.print()
+
+	// image := parseImage(2, 2, "0222112222120000")
+	// image.print()
 }
