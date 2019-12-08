@@ -1,4 +1,4 @@
-package main
+package intcode
 
 import (
 	"testing"
@@ -36,44 +36,44 @@ func TestParameterMode(t *testing.T) {
 }
 
 func TestEquals(t *testing.T) {
-	r := &run{
-		p:      []int{3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8},
-		inputs: []int{8},
+	r := &Run{
+		P:      []int{3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs: []int{8},
 	}
-	r.execute()
-	assert.Equal(t, 1, r.outputs[0])
+	r.Execute()
+	assert.Equal(t, 1, r.Outputs[0])
 }
 
 func TestEqualsImmediate(t *testing.T) {
-	r := &run{
-		p:      []int{3, 3, 1108, -1, 8, 3, 4, 3, 99},
-		inputs: []int{8},
+	r := &Run{
+		P:      []int{3, 3, 1108, -1, 8, 3, 4, 3, 99},
+		Inputs: []int{8},
 	}
-	r.execute()
-	assert.Equal(t, 1, r.outputs[0])
+	r.Execute()
+	assert.Equal(t, 1, r.Outputs[0])
 }
 
 func TestLessThan(t *testing.T) {
-	r := &run{
-		p:      []int{3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8},
-		inputs: []int{5},
+	r := &Run{
+		P:      []int{3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs: []int{5},
 	}
-	r.execute()
-	assert.Equal(t, 1, r.outputs[0])
+	r.Execute()
+	assert.Equal(t, 1, r.Outputs[0])
 }
 
 func TestLessThanImmediate(t *testing.T) {
-	r := &run{
-		p:      []int{3, 9, 1107, 9, 10, 9, 4, 9, 99, -1, 8},
-		inputs: []int{5},
+	r := &Run{
+		P:      []int{3, 9, 1107, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs: []int{5},
 	}
-	r.execute()
-	assert.Equal(t, 1, r.outputs[0])
+	r.Execute()
+	assert.Equal(t, 1, r.Outputs[0])
 }
 
 type programTest struct {
 	input           []int
-	inputs          []int
+	Inputs          []int
 	expectedOutputs []int
 }
 
@@ -103,16 +103,16 @@ func TestProgram(t *testing.T) {
 	}
 
 	for _, test := range testData {
-		r := &run{
-			p:      test.input,
-			inputs: test.inputs,
+		r := &Run{
+			P:      test.input,
+			Inputs: test.Inputs,
 		}
-		r.execute()
+		r.Execute()
 
-		assert.Equal(t, len(test.expectedOutputs), len(r.outputs))
+		assert.Equal(t, len(test.expectedOutputs), len(r.Outputs))
 
 		for i, o := range test.expectedOutputs {
-			assert.Equal(t, o, r.outputs[i])
+			assert.Equal(t, o, r.Outputs[i])
 		}
 	}
 }
