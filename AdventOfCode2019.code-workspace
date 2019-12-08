@@ -1,6 +1,10 @@
 {
 	"folders": [
 		{
+			"name": "Intcode",
+			"path": "Intcode"
+		},
+		{
 			"name": "1",
 			"path": "1"
 		},
@@ -29,8 +33,8 @@
 			"path": "7"
 		},
 		{
-			"name": "Intcode",
-			"path": "Intcode"
+			"name": "8",
+			"path": "8"
 		}
 	]
 }
