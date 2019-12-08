@@ -19,19 +19,24 @@ const (
 type opcode int
 
 const (
-	add      opcode = 1
-	multiply        = 2
-	save            = 3
-	output          = 4
-	halt            = 99
+	add         opcode = 1
+	multiply           = 2
+	save               = 3
+	output             = 4
+	jumpIfTrue         = 5
+	jumpIfFalse        = 6
+	lessThan           = 7
+	equals             = 8
+	halt               = 99
 )
 
 type instruction int
 type program []int // can be instruction or data
 
 type run struct {
-	p      program
-	inputs []int
+	p       program
+	inputs  []int
+	outputs []int
 }
 
 func (i *instruction) decodeOpcode() opcode {
@@ -114,14 +119,54 @@ func (r *run) execute() {
 				inputPtr++
 				i += 2
 			}
+		case jumpIfTrue:
+			{
+				params := p.getParameters(i, instruction, 2, 0)
+				if params[0] != 0 {
+					i = params[1]
+				} else {
+					i += 3
+				}
+			}
+		case jumpIfFalse:
+			{
+				params := p.getParameters(i, instruction, 2, 0)
+				if params[0] == 0 {
+					i = params[1]
+				} else {
+					i += 3
+				}
+			}
+		case lessThan:
+			{
+				params := p.getParameters(i, instruction, 3, 1)
+				if params[0] < params[1] {
+					p.writeValue(params[2], 1)
+				} else {
+					p.writeValue(params[2], 0)
+				}
+				i += 4
+			}
+		case equals:
+			{
+				params := p.getParameters(i, instruction, 3, 1)
+				if params[0] == params[1] {
+					p.writeValue(params[2], 1)
+				} else {
+					p.writeValue(params[2], 0)
+				}
+				i += 4
+			}
 		case output:
 			{
-				params := p.getParameters(i, instruction, 1, 1)
-				fmt.Println(p.getValue(params[0]))
+				params := p.getParameters(i, instruction, 1, 0)
+				r.outputs = append(r.outputs, params[0])
 				i += 2
 			}
 		case halt:
 			return
+		default:
+			panic(fmt.Sprint("Unknown opcode", i, opcode))
 		}
 	}
 }
@@ -149,8 +194,12 @@ func main() {
 
 	r := run{
 		p:      p,
-		inputs: []int{1},
+		inputs: []int{5},
 	}
 
 	r.execute()
+
+	for _, o := range r.outputs {
+		fmt.Println(o)
+	}
 }
