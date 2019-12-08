@@ -6,6 +6,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func makeChannel(input []int) chan int {
+	c := make(chan int, len(input))
+
+	for _, v := range input {
+		c <- v
+	}
+
+	return c
+}
+
 func TestInstructionDecoding(t *testing.T) {
 	i := instruction(1002)
 	assert.Equal(t, opcode(2), i.decodeOpcode())
@@ -37,38 +47,43 @@ func TestParameterMode(t *testing.T) {
 
 func TestEquals(t *testing.T) {
 	r := &Run{
-		P:      []int{3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8},
-		Inputs: []int{8},
+		P:       []int{3, 9, 8, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs:  makeChannel([]int{8}),
+		Outputs: make(chan int, 5),
 	}
 	r.Execute()
-	assert.Equal(t, 1, r.Outputs[0])
+
+	assert.Equal(t, 1, <-r.Outputs)
 }
 
 func TestEqualsImmediate(t *testing.T) {
 	r := &Run{
-		P:      []int{3, 3, 1108, -1, 8, 3, 4, 3, 99},
-		Inputs: []int{8},
+		P:       []int{3, 3, 1108, -1, 8, 3, 4, 3, 99},
+		Inputs:  makeChannel([]int{8}),
+		Outputs: make(chan int, 5),
 	}
 	r.Execute()
-	assert.Equal(t, 1, r.Outputs[0])
+	assert.Equal(t, 1, <-r.Outputs)
 }
 
 func TestLessThan(t *testing.T) {
 	r := &Run{
-		P:      []int{3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8},
-		Inputs: []int{5},
+		P:       []int{3, 9, 7, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs:  makeChannel([]int{5}),
+		Outputs: make(chan int, 5),
 	}
 	r.Execute()
-	assert.Equal(t, 1, r.Outputs[0])
+	assert.Equal(t, 1, <-r.Outputs)
 }
 
 func TestLessThanImmediate(t *testing.T) {
 	r := &Run{
-		P:      []int{3, 9, 1107, 9, 10, 9, 4, 9, 99, -1, 8},
-		Inputs: []int{5},
+		P:       []int{3, 9, 1107, 9, 10, 9, 4, 9, 99, -1, 8},
+		Inputs:  makeChannel([]int{5}),
+		Outputs: make(chan int, 5),
 	}
 	r.Execute()
-	assert.Equal(t, 1, r.Outputs[0])
+	assert.Equal(t, 1, <-r.Outputs)
 }
 
 type programTest struct {
@@ -104,15 +119,16 @@ func TestProgram(t *testing.T) {
 
 	for _, test := range testData {
 		r := &Run{
-			P:      test.input,
-			Inputs: test.Inputs,
+			P:       test.input,
+			Inputs:  makeChannel(test.Inputs),
+			Outputs: make(chan int, len(test.expectedOutputs)),
 		}
 		r.Execute()
 
 		assert.Equal(t, len(test.expectedOutputs), len(r.Outputs))
 
-		for i, o := range test.expectedOutputs {
-			assert.Equal(t, o, r.Outputs[i])
+		for _, o := range test.expectedOutputs {
+			assert.Equal(t, o, <-r.Outputs)
 		}
 	}
 }

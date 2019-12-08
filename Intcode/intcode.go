@@ -33,9 +33,10 @@ type Program []int // can be instruction or data
 
 // Run of program
 type Run struct {
-	P       Program
-	Inputs  []int
-	Outputs []int
+	Identifier *int
+	P          Program
+	Inputs     chan int
+	Outputs    chan int
 }
 
 func (i *instruction) decodeOpcode() opcode {
@@ -91,10 +92,16 @@ func (p *Program) writeValue(address int, value int) {
 	(*p)[address] = value
 }
 
+var debug = true
+
 // Execute program
 func (r *Run) Execute() {
 	p := r.P
-	inputPtr := 0
+
+	myID := -1
+	if r.Identifier != nil {
+		myID = *r.Identifier
+	}
 
 	for i := 0; i < len(p); {
 		instruction := instruction(p.getValue(i))
@@ -115,8 +122,14 @@ func (r *Run) Execute() {
 		case save:
 			{
 				params := p.getParameters(i, instruction, 1, 1)
-				p.writeValue(params[0], r.Inputs[inputPtr])
-				inputPtr++
+				if debug {
+					fmt.Println(myID, " Waiting for input")
+				}
+				input := <-r.Inputs
+				if debug {
+					fmt.Println(myID, " Received ", input)
+				}
+				p.writeValue(params[0], input)
 				i += 2
 			}
 		case jumpIfTrue:
@@ -160,10 +173,16 @@ func (r *Run) Execute() {
 		case output:
 			{
 				params := p.getParameters(i, instruction, 1, 0)
-				r.Outputs = append(r.Outputs, params[0])
+				if debug {
+					fmt.Println(myID, " Outputting ", params[0])
+				}
+				r.Outputs <- params[0]
 				i += 2
 			}
 		case halt:
+			if debug {
+				fmt.Println(myID, " halt.")
+			}
 			return
 		default:
 			panic(fmt.Sprint("Unknown opcode", i, opcode))

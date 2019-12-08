@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 
 	intcode "github.com/cschleiden/adventofcode/Intcode"
 )
@@ -15,28 +16,48 @@ const numAmplifiers = 5
 const numPhaseSettings = 4
 
 func run(p intcode.Program, phases []int) int {
-	previousResult := 0
+	var wg sync.WaitGroup
+
+	var inOut [numAmplifiers]chan int
 
 	for a := 0; a < numAmplifiers; a++ {
-		phaseSetting := phases[a]
+		inOut[a] = make(chan int, 1)
+		inOut[a] <- phases[a]
+	}
 
+	for a := 0; a < numAmplifiers; a++ {
 		pa := make([]int, len(p))
 		copy(pa, p)
 
-		r := &intcode.Run{
-			P:      pa,
-			Inputs: []int{phaseSetting, previousResult},
-		}
-		r.Execute()
+		wg.Add(1)
 
-		previousResult = r.Outputs[0]
+		go func(i int, p2 intcode.Program) {
+			defer wg.Done()
+
+			r := &intcode.Run{
+				Identifier: &i,
+				P:          p2,
+				Inputs:     inOut[i],
+				Outputs:    inOut[(i+1)%numAmplifiers],
+			}
+
+			r.Execute()
+		}(a, pa)
 	}
 
-	return previousResult
+	// Provide A with its initial input
+	inOut[0] <- 0
+
+	// Wait for all programs to halt
+	wg.Wait()
+
+	// Capture E's output
+	result := <-inOut[0]
+	return result
 }
 
 func generatePermutations(f func(input []int)) {
-	perm([]int{0, 1, 2, 3, 4}, f, 0)
+	perm([]int{5, 6, 7, 8, 9}, f, 0)
 }
 
 // being lazy: https://yourbasic.org/golang/generate-permutation-slice-string/
