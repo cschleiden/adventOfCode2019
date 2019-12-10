@@ -10,33 +10,45 @@ type parameterMode int
 const (
 	positionMode  parameterMode = 0
 	immediateMode               = 1
+	relativeMode                = 2
 )
 
 type opcode int
 
 const (
-	add         opcode = 1
-	multiply           = 2
-	save               = 3
-	output             = 4
-	jumpIfTrue         = 5
-	jumpIfFalse        = 6
-	lessThan           = 7
-	equals             = 8
-	halt               = 99
+	add          opcode = 1
+	multiply            = 2
+	save                = 3
+	output              = 4
+	jumpIfTrue          = 5
+	jumpIfFalse         = 6
+	lessThan            = 7
+	equals              = 8
+	relativeBase        = 9
+	halt                = 99
 )
 
 type instruction int
 
 // Program state
-type Program []int // can be instruction or data
+type Program []int64 // can be instruction or data
+
+type Execution struct {
+	InstructionPointer int
+	RelativeBase       int
+	RAM                map[int64]int64
+}
 
 // Run of program
 type Run struct {
+	// Optional identifier for debugging
 	Identifier *int
 	P          Program
-	Inputs     chan int
-	Outputs    chan int
+	Inputs     chan int64
+	Outputs    chan int64
+	Done       chan bool
+
+	Execution Execution
 }
 
 func (i *instruction) decodeOpcode() opcode {
@@ -53,75 +65,106 @@ func (i *instruction) getParameterMode(parameterIdx int) parameterMode {
 	return parameterMode(x % 10)
 }
 
-func (p *Program) getParameterValue(ip int, mode parameterMode) int {
-	pv := p.getValue(ip)
+func (r *Run) getParameterValue(ip int, mode parameterMode) (int64, int64) {
+	pv := r.getValue(int64(ip))
 
 	switch mode {
 	case positionMode:
 		{
-			return p.getValue(pv)
+			return r.getValue(pv), pv
 		}
 	case immediateMode:
 		{
-			return pv
+			return pv, pv
+		}
+	case relativeMode:
+		{
+			return r.getValue(int64(r.Execution.RelativeBase) + pv), int64(r.Execution.RelativeBase) + pv
 		}
 	}
 
 	panic("invalid parameter mode")
 }
 
-func (p *Program) getParameters(ip int, ins instruction, num int, numOutputs int) []int {
-	params := make([]int, num)
+func (r *Run) getParameters(ins instruction, num int, numOutputs int) []int64 {
+	ip := r.Execution.InstructionPointer
+	params := make([]int64, num)
 
 	for i := 0; i < num; i++ {
 		pm := ins.getParameterMode(i)
 		if i >= num-numOutputs {
-			pm = immediateMode
+			if pm == relativeMode {
+				_, rawpv := r.getParameterValue(ip+i+1, pm)
+				params[i] = rawpv
+			} else {
+				// map to immediate mode
+				params[i], _ = r.getParameterValue(ip+i+1, immediateMode)
+			}
+		} else {
+			params[i], _ = r.getParameterValue(ip+i+1, pm)
 		}
-		params[i] = p.getParameterValue(ip+i+1, pm)
 	}
 
 	return params
 }
 
-func (p *Program) getValue(address int) int {
-	return (*p)[address]
+func (r *Run) getValue(address int64) int64 {
+	if v, ok := r.Execution.RAM[address]; ok {
+		return v
+	}
+
+	if address < int64(len(r.P)) {
+		return r.P[address]
+	}
+
+	return 0
 }
 
-func (p *Program) writeValue(address int, value int) {
-	(*p)[address] = value
+func (r *Run) writeValue(address int64, value int64) {
+	if address > int64(len(r.P)) {
+		r.Execution.RAM[address] = value
+	} else {
+		r.P[address] = value
+	}
 }
 
 var debug = true
 
 // Execute program
 func (r *Run) Execute() {
-	p := r.P
-
 	myID := -1
 	if r.Identifier != nil {
 		myID = *r.Identifier
 	}
 
-	for i := 0; i < len(p); {
-		instruction := instruction(p.getValue(i))
+	r.Execution = Execution{
+		InstructionPointer: 0,
+		RAM:                make(map[int64]int64),
+		RelativeBase:       0,
+	}
+
+main:
+	for r.Execution.InstructionPointer < len(r.P) {
+		previousIP := r.Execution.InstructionPointer
+
+		instruction := instruction(r.getValue(int64(r.Execution.InstructionPointer)))
 		opcode := instruction.decodeOpcode()
 		switch opcode {
 		case add:
 			{
-				params := p.getParameters(i, instruction, 3, 1)
-				p.writeValue(params[2], params[0]+params[1])
-				i += 4
+				params := r.getParameters(instruction, 3, 1)
+				r.writeValue(params[2], params[0]+params[1])
+				r.Execution.InstructionPointer += 4
 			}
 		case multiply:
 			{
-				params := p.getParameters(i, instruction, 3, 1)
-				p.writeValue(params[2], params[0]*params[1])
-				i += 4
+				params := r.getParameters(instruction, 3, 1)
+				r.writeValue(params[2], params[0]*params[1])
+				r.Execution.InstructionPointer += 4
 			}
 		case save:
 			{
-				params := p.getParameters(i, instruction, 1, 1)
+				params := r.getParameters(instruction, 1, 1)
 				if debug {
 					fmt.Println(myID, " Waiting for input")
 				}
@@ -129,63 +172,75 @@ func (r *Run) Execute() {
 				if debug {
 					fmt.Println(myID, " Received ", input)
 				}
-				p.writeValue(params[0], input)
-				i += 2
+				r.writeValue(params[0], input)
+				r.Execution.InstructionPointer += 2
 			}
 		case jumpIfTrue:
 			{
-				params := p.getParameters(i, instruction, 2, 0)
+				params := r.getParameters(instruction, 2, 0)
 				if params[0] != 0 {
-					i = params[1]
+					r.Execution.InstructionPointer = int(params[1])
 				} else {
-					i += 3
+					r.Execution.InstructionPointer += 3
 				}
 			}
 		case jumpIfFalse:
 			{
-				params := p.getParameters(i, instruction, 2, 0)
+				params := r.getParameters(instruction, 2, 0)
 				if params[0] == 0 {
-					i = params[1]
+					r.Execution.InstructionPointer = int(params[1])
 				} else {
-					i += 3
+					r.Execution.InstructionPointer += 3
 				}
 			}
 		case lessThan:
 			{
-				params := p.getParameters(i, instruction, 3, 1)
+				params := r.getParameters(instruction, 3, 1)
 				if params[0] < params[1] {
-					p.writeValue(params[2], 1)
+					r.writeValue(params[2], 1)
 				} else {
-					p.writeValue(params[2], 0)
+					r.writeValue(params[2], 0)
 				}
-				i += 4
+				r.Execution.InstructionPointer += 4
 			}
 		case equals:
 			{
-				params := p.getParameters(i, instruction, 3, 1)
+				params := r.getParameters(instruction, 3, 1)
 				if params[0] == params[1] {
-					p.writeValue(params[2], 1)
+					r.writeValue(params[2], 1)
 				} else {
-					p.writeValue(params[2], 0)
+					r.writeValue(params[2], 0)
 				}
-				i += 4
+				r.Execution.InstructionPointer += 4
 			}
 		case output:
 			{
-				params := p.getParameters(i, instruction, 1, 0)
+				params := r.getParameters(instruction, 1, 0)
 				if debug {
 					fmt.Println(myID, " Outputting ", params[0])
 				}
 				r.Outputs <- params[0]
-				i += 2
+				r.Execution.InstructionPointer += 2
+			}
+		case relativeBase:
+			{
+				params := r.getParameters(instruction, 1, 0)
+				r.Execution.RelativeBase += int(params[0])
+				r.Execution.InstructionPointer += 2
 			}
 		case halt:
 			if debug {
 				fmt.Println(myID, " halt.")
 			}
-			return
+			break main
 		default:
-			panic(fmt.Sprint("Unknown opcode", i, opcode))
+			panic(fmt.Sprint("Unknown opcode", r.Execution.InstructionPointer, opcode))
+		}
+
+		if previousIP == r.Execution.InstructionPointer {
+			panic("InstructionPointer is stuck")
 		}
 	}
+
+	r.Done <- true
 }
