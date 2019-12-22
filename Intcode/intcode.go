@@ -1,8 +1,12 @@
 package intcode
 
 import (
+	"bufio"
 	"fmt"
 	"math"
+	"os"
+	"strconv"
+	"strings"
 )
 
 type parameterMode int
@@ -34,8 +38,8 @@ type instruction int
 type Program []int64 // can be instruction or data
 
 type Execution struct {
-	InstructionPointer int
-	RelativeBase       int
+	InstructionPointer int64
+	RelativeBase       int64
 	RAM                map[int64]int64
 }
 
@@ -55,17 +59,17 @@ func (i *instruction) decodeOpcode() opcode {
 	return opcode(int(*i) % 100)
 }
 
-func (i *instruction) getParameterMode(parameterIdx int) parameterMode {
+func (i *instruction) getParameterMode(parameterIdx int64) parameterMode {
 	// Strip of opcode
 	x := int(*i) / 100
 
 	// Get to desired position
-	x = x / int(math.Pow10(parameterIdx))
+	x = x / int(math.Pow10(int(parameterIdx)))
 
 	return parameterMode(x % 10)
 }
 
-func (r *Run) getParameterValue(ip int, mode parameterMode) (int64, int64) {
+func (r *Run) getParameterValue(ip int64, mode parameterMode) (int64, int64) {
 	pv := r.getValue(int64(ip))
 
 	switch mode {
@@ -86,11 +90,11 @@ func (r *Run) getParameterValue(ip int, mode parameterMode) (int64, int64) {
 	panic("invalid parameter mode")
 }
 
-func (r *Run) getParameters(ins instruction, num int, numOutputs int) []int64 {
+func (r *Run) getParameters(ins instruction, num int64, numOutputs int64) []int64 {
 	ip := r.Execution.InstructionPointer
 	params := make([]int64, num)
 
-	for i := 0; i < num; i++ {
+	for i := int64(0); i < num; i++ {
 		pm := ins.getParameterMode(i)
 		if i >= num-numOutputs {
 			if pm == relativeMode {
@@ -121,14 +125,14 @@ func (r *Run) getValue(address int64) int64 {
 }
 
 func (r *Run) writeValue(address int64, value int64) {
-	if address > int64(len(r.P)) {
+	if address >= int64(len(r.P)) {
 		r.Execution.RAM[address] = value
 	} else {
 		r.P[address] = value
 	}
 }
 
-var debug = true
+var debug = false
 
 // Execute program
 func (r *Run) Execute() {
@@ -144,7 +148,7 @@ func (r *Run) Execute() {
 	}
 
 main:
-	for r.Execution.InstructionPointer < len(r.P) {
+	for r.Execution.InstructionPointer < int64(len(r.P)) {
 		previousIP := r.Execution.InstructionPointer
 
 		instruction := instruction(r.getValue(int64(r.Execution.InstructionPointer)))
@@ -165,13 +169,7 @@ main:
 		case save:
 			{
 				params := r.getParameters(instruction, 1, 1)
-				if debug {
-					fmt.Println(myID, " Waiting for input")
-				}
 				input := <-r.Inputs
-				if debug {
-					fmt.Println(myID, " Received ", input)
-				}
 				r.writeValue(params[0], input)
 				r.Execution.InstructionPointer += 2
 			}
@@ -179,7 +177,7 @@ main:
 			{
 				params := r.getParameters(instruction, 2, 0)
 				if params[0] != 0 {
-					r.Execution.InstructionPointer = int(params[1])
+					r.Execution.InstructionPointer = params[1]
 				} else {
 					r.Execution.InstructionPointer += 3
 				}
@@ -188,7 +186,7 @@ main:
 			{
 				params := r.getParameters(instruction, 2, 0)
 				if params[0] == 0 {
-					r.Execution.InstructionPointer = int(params[1])
+					r.Execution.InstructionPointer = params[1]
 				} else {
 					r.Execution.InstructionPointer += 3
 				}
@@ -216,16 +214,13 @@ main:
 		case output:
 			{
 				params := r.getParameters(instruction, 1, 0)
-				if debug {
-					fmt.Println(myID, " Outputting ", params[0])
-				}
 				r.Outputs <- params[0]
 				r.Execution.InstructionPointer += 2
 			}
 		case relativeBase:
 			{
 				params := r.getParameters(instruction, 1, 0)
-				r.Execution.RelativeBase += int(params[0])
+				r.Execution.RelativeBase += params[0]
 				r.Execution.InstructionPointer += 2
 			}
 		case halt:
@@ -240,7 +235,35 @@ main:
 		if previousIP == r.Execution.InstructionPointer {
 			panic("InstructionPointer is stuck")
 		}
+
+		if debug {
+			fmt.Println("IP ", r.Execution.InstructionPointer, " RelBase ", r.Execution.RelativeBase, " OP ", opcode)
+		}
+	}
+}
+
+func ReadFromFile(filename string) Program {
+	file, err := os.Open(filename)
+	if err != nil {
+		os.Exit(1)
 	}
 
-	r.Done <- true
+	scanner := bufio.NewScanner(file)
+	scanner.Split(bufio.ScanLines)
+	scanner.Scan()
+	inputLine := scanner.Text()
+	inputStrings := strings.Split(inputLine, ",")
+
+	p := make(Program, len(inputStrings))
+	for i, v := range inputStrings {
+		v, err := strconv.Atoi(v)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		} else {
+			p[i] = int64(v)
+		}
+	}
+
+	return p
 }

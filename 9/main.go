@@ -41,16 +41,13 @@ func main() {
 	}
 
 	go func() {
-		r.Execute()
-	}()
-
-	go func() {
 		for {
 			r := <-r.Outputs
 			fmt.Println(r)
 		}
 	}()
 
-	r.Inputs <- 2
-	<-r.Done
+	go func() { r.Inputs <- 2 }()
+
+	r.Execute()
 }

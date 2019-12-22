@@ -134,10 +134,7 @@ func TestProgram(t *testing.T) {
 			Outputs: make(chan int64, len(test.expectedOutputs)),
 		}
 
-		go func() {
-			r.Execute()
-		}()
-		<-r.Done
+		r.Execute()
 
 		assert.Equal(t, len(test.expectedOutputs), len(r.Outputs))
 
